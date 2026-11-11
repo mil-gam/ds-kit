@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>DS KIT - 지능형 L7 방어 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 30px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; }
+        .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
+        .card { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
+        .card h3 { margin: 0 0 10px 0; color: #94a3b8; font-size: 13px; }
+        .card .value { font-size: 22px; font-weight: bold; color: #38bdf8; }
+        .chart-box { background-color: #1e293b; padding: 25px; border-radius: 10px; margin-top: 25px; border: 1px solid #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ DS KIT 실시간 지능형 L7 방어 모니터</h1>
+            <span style="color: #4ade80; font-weight: bold; background: #064e3b; padding: 6px 12px; border-radius: 20px;">● SYSTEM ACTIVE</span>
+        </div>
+        
+        <div class="cards">
+            <div class="card">
+                <h3>총 유입 요청</h3>
+                <div class="value" id="tot">0</div>
+            </div>
+            <div class="card">
+                <h3>정상 통과 (200)</h3>
+                <div class="value" style="color: #4ade80;" id="pas">0</div>
+            </div>
+            <div class="card">
+                <h3>공격 차단 (429)</h3>
+                <div class="value" style="color: #f43f5e;" id="blk">0</div>
+            </div>
+            <div class="card">
+                <h3>평활화 CPU ($S_{CPU}$)</h3>
+                <div class="value" style="color: #fbbf24;" id="cpu">0%</div>
+            </div>
+            <div class="card">
+                <h3>동적 임계치 (Limit)</h3>
+                <div class="value" style="color: #c084fc;" id="limit">0</div>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <h3>실시간 트래픽 처리 현황 (Normal vs Blocked Attack)</h3>
+            <canvas id="myChart" height="100"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        // 파이썬 템플릿 엔진에서 주입된 API 키 사용
+        const apiKey = "{{ api_key }}";
+        
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: '정상 통과 (200 OK)', borderColor: '#4ade80', data: [], fill: false, tension: 0.1 },
+                    { label: '차단된 공격 (429)', borderColor: '#f43f5e', data: [], fill: false, tension: 0.1 }
+                ]
+            },
+            options: { responsive: true, animation: false }
+        });
+
+        setInterval(async () => {
+            try {
+                const res = await fetch(`/admin/stats?key=${apiKey}`);
+                if(!res.ok) return;
+                const data = await res.json();
+                
+                document.getElementById('tot').innerText = data.total_requests;
+                document.getElementById('pas').innerText = data.passed_200;
+                document.getElementById('blk').innerText = data.blocked_429;
+                document.getElementById('cpu').innerText = data.current_s_cpu + '%';
+                document.getElementById('limit').innerText = data.final_limit + '회/10s';
+
+                const now = new Date().toLocaleTimeString();
+                if(chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                    chart.data.datasets[1].data.shift();
+                }
+                chart.data.labels.push(now);
+                chart.data.datasets[0].data.push(data.passed_200);
+                chart.data.datasets[1].data.push(data.blocked_429);
+                chart.update();
+            } catch(e) { console.log(e); }
+        }, 1000);
+    </script>
+</body>
+</html>
